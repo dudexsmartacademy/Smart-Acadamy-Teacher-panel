@@ -144,9 +144,16 @@ export const authService = {
       return { user: null, error: 'Authentication service is not configured.' };
     }
 
+    const isLocal =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+    const redirectOrigin =
+      import.meta.env.VITE_SITE_URL ||
+      (isLocal ? window.location.origin : 'https://teacher.dudexsmartacademy.in');
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo: `${redirectOrigin}/dashboard` },
     });
 
     return {
@@ -321,8 +328,15 @@ export const authService = {
       return { success: false, error: 'Authentication service is not configured.' };
     }
 
+    const isLocal =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+    const redirectOrigin =
+      import.meta.env.VITE_SITE_URL ||
+      (isLocal ? window.location.origin : 'https://teacher.dudexsmartacademy.in');
+
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${redirectOrigin}/reset-password`,
     });
 
     if (error) {
