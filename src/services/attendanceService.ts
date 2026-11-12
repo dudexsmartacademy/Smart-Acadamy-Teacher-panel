@@ -48,16 +48,12 @@ export const attendanceService = {
   async getRecordsForDate(
     batches: string[],
     date: string,
-    subject?: string,
+    _subject?: string,
   ): Promise<Array<{ studentId: string; status: string; time: string }>> {
     if (!isSupabaseConfigured) return [];
     let q = supabase.from('attendance_records').select('*').eq('date', date);
     if (batches.length > 0) {
       q = q.in('batch_name', batches);
-    }
-    if (subject && subject.trim()) {
-      const cleanSubj = subject.trim();
-      q = q.or(`subject.ilike.%${cleanSubj}%,subject.ilike.%General%`);
     }
     const { data, error } = await q;
     if (error || !data) return [];
@@ -105,7 +101,7 @@ export const attendanceService = {
       let teacherName = userResp?.user?.user_metadata?.full_name;
       if (!teacherName) {
         const { data: tp } = await supabase.from('profiles').select('full_name').eq('id', authUserId).maybeSingle();
-        teacherName = (tp as any)?.full_name || 'vegeta';
+        teacherName = (tp as any)?.full_name || 'Faculty Member';
       }
 
       // Status must be title case to satisfy the attendance_records check constraint.
@@ -117,15 +113,15 @@ export const attendanceService = {
         return 'Present';
       };
 
-      const subject = payload.subject || 'Core Subject';
+      const subject = payload.subject && payload.subject !== 'Core Subject' ? payload.subject : 'General';
       const studentIds = payload.attendance.map((att) => att.studentId);
 
-      // One record per student, date and subject (class_id is unused for batches).
+      // One daily batch record per student and date (class_id is unused for batches),
+      // so Teacher, Admin, and Student code check-ins update the same row.
       const { data: existing, error: existingError } = await supabase
         .from('attendance_records')
         .select('id, student_id')
         .eq('date', payload.date)
-        .eq('subject', subject)
         .is('class_id', null)
         .in('student_id', studentIds);
       if (existingError) throw new Error(`Could not read existing attendance: ${existingError.message}`);
@@ -138,6 +134,7 @@ export const attendanceService = {
             status: toDbStatus(att.status),
             teacher_id: authUserId,
             teacher_name: teacherName,
+            subject,
             batch_name: att.batchName || null
           })
           .eq('id', existingMap.get(att.studentId) as string);
