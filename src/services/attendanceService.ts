@@ -113,11 +113,10 @@ export const attendanceService = {
         return 'Present';
       };
 
-      const subject = payload.subject && payload.subject !== 'Core Subject' ? payload.subject : 'General';
+      const subject = (payload.subject && payload.subject.trim()) || 'General';
       const studentIds = payload.attendance.map((att) => att.studentId);
 
-      // One daily batch record per student and date (class_id is unused for batches),
-      // so Teacher, Admin, and Student code check-ins update the same row.
+      // One record per student and date for batch attendance (class_id is null)
       const { data: existing, error: existingError } = await supabase
         .from('attendance_records')
         .select('id, student_id')

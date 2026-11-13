@@ -67,10 +67,7 @@ export default function Attendance() {
   const [liveClasses, setLiveClasses] = useState<LiveClassItem[]>([]);
   const [selectedLiveClassId, setSelectedLiveClassId] = useState<string>("");
 
-  const [date, setDate] = useState(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  });
+  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
 
   const [records, setRecords] = useState<
     Record<string, AttendanceRecord>
