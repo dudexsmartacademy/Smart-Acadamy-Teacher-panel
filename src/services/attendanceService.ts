@@ -46,16 +46,17 @@ export const attendanceService = {
 
   /** Attendance already recorded for the batches on a date (manual or code check-in). */
   async getRecordsForDate(
-    batches: string[],
+    _batches: string[],
     date: string,
     _subject?: string,
   ): Promise<Array<{ studentId: string; status: string; time: string }>> {
     if (!isSupabaseConfigured) return [];
-    let q = supabase.from('attendance_records').select('*').eq('date', date);
-    if (batches.length > 0) {
-      q = q.in('batch_name', batches);
-    }
-    const { data, error } = await q;
+    // Load all records on that date so attendance marked by Admin,
+    // Teacher, or Student check-in is never hidden due to batch_name variations.
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('*')
+      .eq('date', date);
     if (error || !data) return [];
     return data.map((row: Record<string, unknown>) => ({
       studentId: (row.student_id as string) || '',

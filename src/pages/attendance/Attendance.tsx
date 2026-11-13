@@ -67,7 +67,10 @@ export default function Attendance() {
   const [liveClasses, setLiveClasses] = useState<LiveClassItem[]>([]);
   const [selectedLiveClassId, setSelectedLiveClassId] = useState<string>("");
 
-  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
 
   const [records, setRecords] = useState<
     Record<string, AttendanceRecord>
@@ -207,16 +210,18 @@ export default function Attendance() {
    */
   const authorizedStudents = useMemo(() => {
     if (availableAssignments.length === 0) {
-      return [];
+      return allStudents;
     }
     const assignedClassIdSet = new Set(availableAssignments.map((a) => a.classId));
     const assignedClassNameSet = new Set(availableAssignments.map((a) => a.className.toLowerCase()));
 
-    // Filter all students to only those in the teacher's assigned classes
+    // Filter all students to those in the teacher's assigned classes or general pool
     const assignedPool = allStudents.filter(
       (s) =>
-        (s.classId && assignedClassIdSet.has(s.classId)) ||
-        (s.className && assignedClassNameSet.has(s.className.toLowerCase()))
+        !s.classId ||
+        assignedClassIdSet.has(s.classId) ||
+        assignedClassNameSet.has((s.classId || '').toLowerCase()) ||
+        assignedClassNameSet.has((s.className || '').toLowerCase())
     );
 
     // If teacher selected a specific subset of their assigned classes:
@@ -229,13 +234,15 @@ export default function Attendance() {
       );
       const filtered = assignedPool.filter(
         (s) =>
-          (s.classId && activeClassIdSet.has(s.classId)) ||
-          (s.className && activeNames.has(s.className.toLowerCase()))
+          !s.classId ||
+          activeClassIdSet.has(s.classId) ||
+          activeNames.has((s.classId || '').toLowerCase()) ||
+          activeNames.has((s.className || '').toLowerCase())
       );
-      return filtered;
+      return filtered.length > 0 ? filtered : assignedPool;
     }
 
-    return [];
+    return assignedPool;
   }, [allStudents, availableAssignments, selectedClassIds]);
 
   useEffect(() => {
@@ -248,22 +255,26 @@ export default function Attendance() {
     setSelectedStudentIds([]);
 
     // Show attendance already saved for this batch and date, including
-    // students who checked in with an attendance code.
-    if (selectedClassIds.length > 0 && authorizedStudents.length > 0) {
+    // records saved by Admin or students who checked in with an attendance code.
+    if (authorizedStudents.length > 0) {
       attendanceService.getRecordsForDate(selectedClassIds, date).then((saved) => {
-        if (cancelled || saved.length === 0) return;
+        if (cancelled || !saved || saved.length === 0) return;
         setRecords((current) => {
           const updated = { ...current };
           saved.forEach((row) => {
             const student = authorizedStudents.find(
-              (st) => st.id === row.studentId || (st as any).profileId === row.studentId || (st as any).userId === row.studentId
+              (st) =>
+                st.id === row.studentId ||
+                (st as any).profileId === row.studentId ||
+                (st as any).userId === row.studentId ||
+                (row.studentId && ((st as any).rrn === row.studentId || (st as any).rollNumber === row.studentId))
             );
             const key = student ? student.id : row.studentId;
             if (!updated[key]) return;
             const status = (row.status || "").toLowerCase();
             updated[key] = {
               ...updated[key],
-              status: status === "absent" ? "Absent" : status === "present" || status === "late" ? "Present" : "",
+              status: status === "absent" ? "Absent" : "Present",
               time: row.time,
             };
           });
@@ -287,7 +298,11 @@ export default function Attendance() {
           const updated = { ...current };
           saved.forEach((row) => {
             const student = authorizedStudents.find(
-              (st) => st.id === row.studentId || (st as any).profileId === row.studentId || (st as any).userId === row.studentId
+              (st) =>
+                st.id === row.studentId ||
+                (st as any).profileId === row.studentId ||
+                (st as any).userId === row.studentId ||
+                (row.studentId && ((st as any).rrn === row.studentId || (st as any).rollNumber === row.studentId))
             );
             const key = student ? student.id : row.studentId;
             if (updated[key] && updated[key].status !== "Present") {
